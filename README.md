@@ -52,7 +52,7 @@ Following steps are necessary for that:
    [Ditto Protocol](https://www.eclipse.org/ditto/protocol-specification.html) - [here you can find](https://www.eclipse.org/ditto/protocol-examples.html)
    some example Ditto Protocol messages
    
-As a starting point you can also let the [Developer console](https://console-bcx.bosch-iot-suite.com) generate an example
+You can also let the [Developer console](https://console-bcx.bosch-iot-suite.com) generate an example (e.g. Arduino)
 as starting point, have a look at the [tutorials](https://preview.bosch-iot-suite.com/tutorials/) for that.
 
 
