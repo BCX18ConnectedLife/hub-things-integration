@@ -37,11 +37,12 @@ Server-Sent-Events your applications can for example be notified about changes o
 You can connect your own devices in this setup by connecting to one of the Bosch IoT Hub protocol adapters.
 
 Following steps are necessary for that:
-1. create a [Thing Type](https://preview.bosch-iot-suite.com/tutorials/dx_create_thingtype/) via 
+1. (optional) create a [Thing Type](https://preview.bosch-iot-suite.com/tutorials/dx_create_thingtype/) via 
    [Eclipse Vorto](https://eclipse.org/vorto) for your device describing its data and capabilities in order to have
    type information for your device
 2. register your device in the Bosch IoT Suite via the [Developer console](https://console-bcx.bosch-iot-suite.com): 
    [tutorial](https://preview.bosch-iot-suite.com/tutorials/dx_register_device/)
+   * if this step fails and you want to connect an XDK, [use the manual way](#manual-way-for-connecting-xdk)
 3. choose a protocol (MQTT or HTTP) your device is capable to speak
     1. alternatively, if your device is not powerful enough to do HTTP or MQTT directly, use a gateway (e.g. a RaspberryPi)
        as an intermediate connecting your device
@@ -54,6 +55,7 @@ Following steps are necessary for that:
    
 You can also let the [Developer console](https://console-bcx.bosch-iot-suite.com) generate an example (e.g. Arduino)
 as starting point, have a look at the [tutorials](https://preview.bosch-iot-suite.com/tutorials/) for that.
+
 
 
 ### HTTP example
@@ -108,3 +110,88 @@ mosquitto_pub -h mqtt.bosch-iot-hub.com -p 8883 --cafile iothub.crt \
 
 Further documentation on the protocol adapters can be found in the 
 [getting started of Bosch IoT Hub](http://docs.bosch-iot-hub.com/userguide/gettingstarted.html).
+
+
+
+## Manual way for connecting XDK
+
+The Developer Console autmatically does all of the following steps. If you need more control of the creation process, 
+feel free to do it the manual way.
+
+The manual way of connecting an XDK to both Bosch IoT Things and Bosch IoT Hub is the following:
+
+```bash
+DEVICE_ID='the-device-id'
+
+# Register device in Bosch IoT Things
+AUTH_INFO=$(echo -n "bcx18:bcx18!Open2" | base64) 
+curl -X PUT https://things.s-apps.de1.bosch-iot-cloud.com/api/2/things/BCX18:$DEVICE_ID \
+    -H "authorization: Basic $AUTH_INFO" \
+    -H 'x-cr-api-token: db7f4e0cca344d32be72914311f1055f' \ 
+    -d "{
+          'thingId': 'BCX18:$DEVICE_ID',
+          'attributes': {
+            'schema': {
+              'Accelerometer_0': 'com.ipso.smartobjects.Accelerometer:0.0.2',
+              'Barometer_0': 'com.ipso.smartobjects.Barometer:0.0.2',
+              'Button_0': 'com.ipso.smartobjects.Push_button:0.0.2',
+              'AlertNotification_0': 'com.bosch.demo.xdk.fb.AlertNotification:1.0.0',
+              'Illuminance_0': 'com.ipso.smartobjects.Illuminance:0.0.2',
+              'Temperature_0': 'com.ipso.smartobjects.Temperature:0.0.2',
+              'Gyrometer_0': 'com.ipso.smartobjects.Gyrometer:0.0.2',
+              'FirmwareUpdate_0': 'org.oma.lwm2m.Firmware_Update:0.0.2',
+              'Humidity_0': 'com.ipso.smartobjects.Humidity:0.0.2',
+              'LightControl_0': 'com.ipso.smartobjects.Light_Control:0.0.2',
+              'LightControl_1': 'com.ipso.smartobjects.Light_Control:0.0.2',
+              'LightControl_2': 'com.ipso.smartobjects.Light_Control:0.0.2',
+              'Magnetometer_0': 'com.ipso.smartobjects.Magnetometer:0.0.2'
+            },
+            '_modelId': 'com.bosch.devices.XDK:2.0.0',
+            'thingName': 'MyXDK',
+            'createdOn': '2018-02-21 10:06:31+0000',
+            'deviceId': '$DEVICE_ID'
+          },
+          'features': {}
+        }"
+
+
+# Allow XDK connector to update the just created Thing in Bosch IoT Things:
+curl -X PUT https://things.s-apps.de1.bosch-iot-cloud.com/api/2/policies/BCX18:$DEVICE_ID/entries/hubbridge \
+    -H "authorization: Basic $AUTH_INFO" \ 
+    -H 'x-cr-api-token: db7f4e0cca344d32be72914311f1055f' \ 
+    -d '{
+          "subjects": {
+            "iot-things:461b0695-3ae8-4e50-a2db-e2d66e6fcbd2:hub": {
+              "type": "iot-things-clientid"
+            }
+          },
+          "resources": {
+            "thing:/features": {
+              "grant": ["READ","WRITE"],
+              "revoke": []
+            }
+          }
+        }'
+
+# Register device in Bosch IoT Hub:
+curl -X POST https://device-registry.bosch-iot-hub.com/registration/BCX18 \
+    -H "Content-Type: application/json" \
+    -d "{'device-id': '$DEVICE_ID','thingId':'BCX18:$DEVICE_ID','modelId':'com.bosch.devices.XDK:2.0.0'}"
+
+
+# Add credential of device in Bosch IoT Hub:
+PWD_HASH=$(echo -n "" | openssl dgst -binary -sha512 | base64 | tr -d '\n') 
+curl -X POST https://device-registry.bosch-iot-hub.com/credentials/BCX18 \
+    -H "Accept: application/json" \
+    -d "{
+          'device-id': '$DEVICE_ID',
+          'auth-id': null,
+          'type': 'hashed-password',
+          'secrets': [
+            {
+              'hash-function': 'sha-512',
+              'pwd-hash': '$PWD_HASH'
+            }
+          ]
+        }"
+```
